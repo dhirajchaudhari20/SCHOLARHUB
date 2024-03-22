@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hello A.I. Bot!</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <script type="module">
+        window.addEventListener('load', (event) => {
+
+            document.querySelector(".sendMessage").addEventListener('click', (event) => {
+
+                event.currentTarget.classList.add('is-loading');
+                event.currentTarget.disabled = true;
+
+                document.querySelector(".result").parentElement.classList.add("is-hidden");
+                document.querySelector(".error").parentElement.classList.add("is-hidden");
+
+                let currHour = new Date();
+
+                const userMsgTemplate = `<div class="columns">
+                                        <div class="column is-one-third"></div>
+                                        <div class="column">
+                                            <div class="notification is-success">
+                                                <h6 class="subtitle is-6">${currHour.getHours() + ":" + currHour.getMinutes()}</h6>
+                                                ${document.querySelector(".message").value}
+                                            </div>
+                                        </div>
+                                    </div>`
+
+
+                let chatBox = document.querySelector(".messageHistory");
+
+                chatBox.innerHTML += userMsgTemplate;
+                chatBox.scrollIntoView(false);
+
+                const payload = JSON.stringify({
+                    "message": document.querySelector(".message").value
+                });
+
+                document.querySelector(".message").value = "";
+
+                fetch('requestmanager.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: payload,
+                }).then(response => response.json())
+                    .then(data => {
+
+                        let currHour = new Date();
+
+                        data.responseMessage = data.responseMessage.replace("\n", "<br>");
+
+                        let aiMsgTemplate = `<div class="columns">
+                                                <div class="column">
+                                                    <div class="notification is-info">
+                                                        <h6 class="subtitle is-6">${currHour.getHours() + ":" + currHour.getMinutes()}</h6>
+                                                        ${data.responseMessage}
+                                                    </div>
+                                                </div>
+                                                <div class="column is-one-third"></div>
+                                            </div>`
+
+                        chatBox.innerHTML += aiMsgTemplate;
+                        chatBox.scrollIntoView(false);
+
+                    })
+                    .catch((error) => {
+                        console.error('Error:', error);
+                    }).finally(() => {
+                        document.querySelector(".sendMessage").classList.remove('is-loading');
+                        document.querySelector(".sendMessage").disabled = false;
+                    });
+            });
+
+        });
+    </script>
+</head>
+
+<body>
+    <section class="section">
+        <div class="container">
+            <div class="columns  box">
+                <div class="column">
+                    <div class="columns">
+                        <div class="column has-text-centered">
+                            <h1 class="title">
+                                Hello A.I. Bot!
+                            </h1>
+                        </div>
+                    </div>
+                    <div class="columns">
+                        <div class="column">
+                            <div class="card-content" style="height:600px;overflow:auto;flex-grow: 1;flex-shrink: 1;">
+                                <div class="content messageHistory">
+
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <div class="columns">
+                        <div class="column">
+                            <input class="input message" type="text" placeholder="Type your message">
+                        </div>
+                        <div class="column is-narrow">
+                            <button class="button is-info sendMessage">
+                                Send
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <div class="columns box is-hidden">
+                <div class="column result"></div>
+            </div>
+            <div class="columns box is-hidden">
+                <div class="column notification is-danger error has-text-centered">
+                </div>
+            </div>
+        </div>
+    </section>
+</body>
+
+</html>
+
+<?php
+
+/**
+ * ChatBot Class
+ */
+class ChatBot
+{
+    /**
+     * @var string The authorization token for the API
+     */
+    private $authorization;
+
+    /**
+     * @var string The endpoint URL for the OpenAI.com API
+     */
+    private $endpoint;
+
+    /**
+     * ChatBot constructor.
+     */
+    public function __construct()
+    {
+        // This token is not real, in case you were thinking what I'm thinking...
+        $this->authorization = 'sk-bkd04ADr2TXXDGugb2NEWuH3BlbkFJFavL1XJbMZcFIegY5qY';
+        $this->endpoint = 'https://api.openai.com/v1/chat/completions';
+    }
+
+    /**
+     * Send a message to the API and return the response.
+     *
+     * @param string $message The message to send
+     * @return string The response message
+     * @throws Exception If there is an error in sending the message via cURL
+     */
+    public function sendMessage(string $message): string
+    {
+        // Read sample data from our JSON file
+        $jsonSampleData = file_get_contents("test-data.json");
+
+        // Prepare data for sending
+        $data = [
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => 'You are a kind and helpful customer service member at a PC components store. 
+                    If the user asks how to buy, refer them to our website at https://medium.com/winkhosting.
+                    If the user asks anything about CPUs or RAM, use exclusively the cpu or ram input in the following JSON string to suggest options:' . $jsonSampleData
+                ],
+                [
+                    'role' => 'user',
+                    'content' => $message
+                ],
+            ],
+            'model' => 'gpt-3.5-turbo'
+        ];
+
+        // Set headers for the API request
+        $headers = [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $this->authorization,
+        ];
+
+        // Send the request to the API using cURL
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $this->endpoint);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $response = curl_exec($ch);
+
+        // Check for errors in the API response
+        if (curl_errno($ch)) {
+            $error = curl_error($ch);
+            curl_close($ch);
+            throw new Exception('Error sending the message: ' . $error);
+        }
+
+        curl_close($ch);
+
+        // Parse the API response
+        $arrResult = json_decode($response, true);
+        $resultMessage = $arrResult["choices"][0]["message"]["content"];
+
+        // Return the response message
+        return $resultMessage;
+    }
+}
+?>
+
+<?php
+
+// Include the definition of the ChatBot class to be used for our query.
+require("ChatBot.php");
+
+// Decode the parameters received from the index.html file and store them in the $paramsFetch array.
+$paramsFetch = json_decode(
+    file_get_contents("php://input"),
+    true
+);
+
+$ChatBot = new ChatBot();
+
+// Send the message to our AI.
+$resMessage = $ChatBot->sendMessage($paramsFetch["message"]);
+
+// Next, we return the response in JSON format and exit the execution.
+$jsonResponse = json_encode(array("responseMessage" => $resMessage));
+echo $jsonResponse;
+exit;
+?>
